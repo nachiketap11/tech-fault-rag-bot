@@ -1,5 +1,5 @@
-Tech Fault RAG Chatbot
-
+**Tech Fault RAG Chatbot
+**
 A Retrieval-Augmented Generation (RAG) chatbot designed to answer technical queries by combining vector search with large language models. This project enables accurate, context-aware responses by retrieving relevant documents before generating answers.
 
 Features
