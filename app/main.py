@@ -1,8 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from app.services.qa import answer_with_citations
+from app.config import FRONTEND_ORIGINS
 
 app = FastAPI(title="Tech Fault RAG Bot")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class QuestionRequest(BaseModel):

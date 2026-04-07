@@ -1,0 +1,250 @@
+:root {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: #e6eef5;
+  background:
+    radial-gradient(circle at top, rgba(38, 113, 177, 0.35), transparent 35%),
+    linear-gradient(180deg, #08111d 0%, #0d1726 100%);
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 32px 20px 48px;
+}
+
+.panel {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #7dc4ff;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 1;
+}
+
+.hero-copy {
+  max-width: 760px;
+  margin: 12px 0 0;
+  color: #bed0e2;
+}
+
+.question-form,
+.card {
+  border: 1px solid rgba(125, 196, 255, 0.16);
+  background: rgba(6, 17, 29, 0.72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+}
+
+.question-form {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-radius: 24px;
+}
+
+.field-label,
+.card-header h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.question-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(190, 208, 226, 0.2);
+  border-radius: 18px;
+  color: #f5fbff;
+  background: rgba(10, 23, 38, 0.95);
+  resize: vertical;
+}
+
+.question-input:focus {
+  outline: 2px solid #7dc4ff;
+  outline-offset: 2px;
+}
+
+.submit-button {
+  justify-self: start;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 999px;
+  color: #06111d;
+  background: linear-gradient(135deg, #7dc4ff, #a6ffcb);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submit-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.error-banner {
+  margin: 16px 0 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 125, 125, 0.35);
+  border-radius: 16px;
+  color: #ffd2d2;
+  background: rgba(122, 24, 24, 0.28);
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.card {
+  border-radius: 24px;
+  padding: 20px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card-header h2 {
+  margin: 0;
+}
+
+.chunk-count,
+.question-summary {
+  color: #bed0e2;
+  font-size: 0.92rem;
+}
+
+.answer-body p {
+  margin: 0 0 12px;
+}
+
+.citations-panel {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(190, 208, 226, 0.12);
+}
+
+.citations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.citations-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.citations-header span,
+.citation-meta {
+  color: #9eb5c8;
+  font-size: 0.88rem;
+}
+
+.citation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.citation-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border: 1px solid rgba(190, 208, 226, 0.12);
+  border-radius: 18px;
+  background: rgba(10, 23, 38, 0.78);
+}
+
+.citation-badge {
+  min-width: 78px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #06111d;
+  background: linear-gradient(135deg, #7dc4ff, #a6ffcb);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.citation-content p {
+  margin: 0;
+}
+
+.citation-content p + p {
+  margin-top: 6px;
+}
+
+.chunk-list {
+  display: grid;
+  gap: 12px;
+}
+
+.chunk-item {
+  border: 1px solid rgba(190, 208, 226, 0.14);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(10, 23, 38, 0.8);
+}
+
+.chunk-item summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.chunk-item p {
+  margin: 12px 0 0;
+  color: #d3e2ef;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .citation-item {
+    grid-template-columns: 1fr;
+  }
+}
