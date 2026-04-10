@@ -179,6 +179,24 @@ def update_conversation_title(conversation_id: str, title: str) -> None:
         )
 
 
+def delete_conversation(conversation_id: str) -> None:
+    with _get_connection() as connection:
+        connection.execute(
+            """
+            DELETE FROM messages
+            WHERE conversation_id = ?
+            """,
+            (conversation_id,),
+        )
+        connection.execute(
+            """
+            DELETE FROM conversations
+            WHERE id = ?
+            """,
+            (conversation_id,),
+        )
+
+
 def count_messages(conversation_id: str) -> int:
     with _get_connection() as connection:
         row = connection.execute(

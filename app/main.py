@@ -7,6 +7,7 @@ from app.services.history import (
     add_message,
     count_messages,
     create_conversation,
+    delete_conversation,
     get_conversation,
     initialize_history_db,
     list_conversations,
@@ -35,6 +36,10 @@ class ConversationCreateRequest(BaseModel):
     title: str = "New chat"
 
 
+class ConversationUpdateRequest(BaseModel):
+    title: str
+
+
 @app.get("/")
 def root():
     return {"message": "Tech Fault RAG Bot is running"}
@@ -57,6 +62,30 @@ def get_conversation_by_id(conversation_id: str):
         raise HTTPException(status_code=404, detail="Conversation not found")
 
     return conversation
+
+
+@app.patch("/conversations/{conversation_id}")
+def update_conversation_by_id(
+    conversation_id: str,
+    request: ConversationUpdateRequest,
+):
+    conversation = get_conversation(conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    title = request.title.strip() or "New chat"
+    update_conversation_title(conversation_id, title)
+    return get_conversation(conversation_id)
+
+
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation_by_id(conversation_id: str):
+    conversation = get_conversation(conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    delete_conversation(conversation_id)
+    return {"deleted": True, "conversation_id": conversation_id}
 
 
 @app.get("/conversations/{conversation_id}/messages")

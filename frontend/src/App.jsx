@@ -75,10 +75,13 @@ function App() {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [draftTitle, setDraftTitle] = useState("");
   const [error, setError] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     async function bootstrap() {
@@ -121,6 +124,7 @@ function App() {
       );
       setActiveConversationId(conversationId);
       setMessages(data.messages);
+      setDraftTitle(data.conversation.title);
       setConversations(
         conversationSnapshot.map((conversation) =>
           conversation.id === conversationId ? data.conversation : conversation,
@@ -154,6 +158,7 @@ function App() {
       setConversations((currentConversations) => [conversation, ...currentConversations]);
       setActiveConversationId(conversation.id);
       setMessages([]);
+      setDraftTitle(conversation.title);
       setQuestion("");
       return conversation;
     } catch (requestError) {
@@ -227,6 +232,92 @@ function App() {
     }
   }
 
+  async function handleRenameConversation(event) {
+    event.preventDefault();
+
+    if (!activeConversationId || isRenaming) {
+      return;
+    }
+
+    const trimmedTitle = draftTitle.trim() || "New chat";
+    setIsRenaming(true);
+    setError("");
+
+    try {
+      const updatedConversation = await fetchJson(
+        `${API_BASE_URL}/conversations/${activeConversationId}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: trimmedTitle,
+          }),
+        },
+      );
+
+      setDraftTitle(updatedConversation.title);
+      setConversations((currentConversations) =>
+        currentConversations.map((conversation) =>
+          conversation.id === updatedConversation.id
+            ? updatedConversation
+            : conversation,
+        ),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Something went wrong while renaming the conversation.",
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  }
+
+  async function handleDeleteConversation() {
+    if (!activeConversationId || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError("");
+
+    try {
+      await fetchJson(`${API_BASE_URL}/conversations/${activeConversationId}`, {
+        method: "DELETE",
+      });
+
+      const remainingConversations = conversations.filter(
+        (conversation) => conversation.id !== activeConversationId,
+      );
+
+      setConversations(remainingConversations);
+      setMessages([]);
+      setQuestion("");
+
+      if (remainingConversations.length > 0) {
+        await loadConversationMessages(
+          remainingConversations[0].id,
+          remainingConversations,
+        );
+      } else {
+        setActiveConversationId(null);
+        setDraftTitle("");
+        await handleCreateConversation();
+      }
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Something went wrong while deleting the conversation.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
@@ -281,6 +372,38 @@ function App() {
               retrieved source in a saved thread.
             </p>
           </header>
+
+          <form className="conversation-toolbar" onSubmit={handleRenameConversation}>
+            <div className="toolbar-field">
+              <label className="field-label" htmlFor="conversation-title">
+                Conversation title
+              </label>
+              <input
+                id="conversation-title"
+                className="title-input"
+                disabled={!activeConversation || isRenaming || isDeleting}
+                onChange={(event) => setDraftTitle(event.target.value)}
+                value={draftTitle}
+              />
+            </div>
+            <div className="toolbar-actions">
+              <button
+                className="secondary-button"
+                disabled={!activeConversation || isRenaming || isDeleting}
+                type="submit"
+              >
+                {isRenaming ? "Saving..." : "Rename"}
+              </button>
+              <button
+                className="danger-button"
+                disabled={!activeConversation || isDeleting || isRenaming}
+                onClick={handleDeleteConversation}
+                type="button"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </form>
 
           {error ? <p className="error-banner">{error}</p> : null}
 

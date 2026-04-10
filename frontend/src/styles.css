@@ -19,7 +19,8 @@ body {
 }
 
 button,
-textarea {
+textarea,
+input {
   font: inherit;
 }
 
@@ -101,17 +102,37 @@ textarea {
 }
 
 .new-chat-button,
-.submit-button {
+.submit-button,
+.secondary-button,
+.danger-button {
   border: 0;
   border-radius: 999px;
-  color: #06111d;
-  background: linear-gradient(135deg, #7dc4ff, #a6ffcb);
   font-weight: 700;
   cursor: pointer;
 }
 
-.new-chat-button {
+.new-chat-button,
+.submit-button {
+  color: #06111d;
+  background: linear-gradient(135deg, #7dc4ff, #a6ffcb);
+}
+
+.new-chat-button,
+.secondary-button,
+.danger-button {
   padding: 12px 18px;
+}
+
+.secondary-button {
+  color: #e6eef5;
+  background: rgba(35, 61, 88, 0.92);
+  border: 1px solid rgba(125, 196, 255, 0.22);
+}
+
+.danger-button {
+  color: #ffe7e7;
+  background: rgba(125, 34, 34, 0.92);
+  border: 1px solid rgba(255, 125, 125, 0.3);
 }
 
 .conversation-list {
@@ -150,10 +171,32 @@ textarea {
 
 .chat-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   gap: 18px;
   padding: 24px;
   min-height: calc(100vh - 48px);
+}
+
+.conversation-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(190, 208, 226, 0.12);
+  border-radius: 22px;
+  background: rgba(10, 23, 38, 0.72);
+}
+
+.toolbar-field {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .error-banner {
@@ -296,6 +339,7 @@ textarea {
   border-radius: 24px;
 }
 
+.title-input,
 .question-input {
   width: 100%;
   padding: 14px 16px;
@@ -303,9 +347,13 @@ textarea {
   border-radius: 18px;
   color: #f5fbff;
   background: rgba(10, 23, 38, 0.95);
+}
+
+.question-input {
   resize: vertical;
 }
 
+.title-input:focus,
 .question-input:focus {
   outline: 2px solid #7dc4ff;
   outline-offset: 2px;
@@ -316,7 +364,9 @@ textarea {
   padding: 12px 20px;
 }
 
-.submit-button:disabled {
+.submit-button:disabled,
+.secondary-button:disabled,
+.danger-button:disabled {
   opacity: 0.7;
   cursor: wait;
 }
@@ -339,12 +389,21 @@ textarea {
 
   .sidebar-header,
   .chat-header,
-  .citations-header {
+  .citations-header,
+  .conversation-toolbar {
     flex-direction: column;
     align-items: start;
   }
 
   .citation-item {
     grid-template-columns: 1fr;
+  }
+
+  .toolbar-actions {
+    width: 100%;
+  }
+
+  .toolbar-actions button {
+    flex: 1;
   }
 }
