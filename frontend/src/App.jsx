@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -24,7 +24,7 @@ function splitAnswerAndCitations(answer) {
       const match = line.match(/^\[Source\s+(\d+)\]\s*(.*)$/i);
       return {
         label: match ? `Source ${match[1]}` : "Source",
-        sourceNumber: match ? Number(match[1]) : null,
+        source_number: match ? Number(match[1]) : null,
         detail: match ? match[2] : line,
       };
     });
@@ -43,151 +43,352 @@ function formatAnswerParagraphs(answerText) {
     .map((line) => line || "\u00a0");
 }
 
+function getDisplayContent(message) {
+  if (message.role !== "assistant") {
+    return {
+      answerText: message.content,
+      citations: [],
+    };
+  }
+
+  if (message.citations?.length) {
+    const parsed = splitAnswerAndCitations(message.content);
+    return {
+      answerText: parsed.answerText,
+      citations: message.citations,
+    };
+  }
+
+  return splitAnswerAndCitations(message.content);
+}
+
+async function fetchJson(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
 function App() {
   const [question, setQuestion] = useState("");
-  const [result, setResult] = useState(null);
+  const [conversations, setConversations] = useState([]);
+  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
-  async function handleSubmit(event) {
-    event.preventDefault();
+  useEffect(() => {
+    async function bootstrap() {
+      setError("");
 
-    const trimmedQuestion = question.trim();
-    if (!trimmedQuestion) {
-      return;
+      try {
+        const data = await fetchJson(`${API_BASE_URL}/conversations`);
+        const loadedConversations = data.conversations;
+        setConversations(loadedConversations);
+
+        if (loadedConversations.length > 0) {
+          await loadConversationMessages(loadedConversations[0].id, loadedConversations);
+        } else {
+          await handleCreateConversation();
+        }
+      } catch (requestError) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : "Something went wrong while loading chat history.",
+        );
+      } finally {
+        setIsBootstrapping(false);
+      }
     }
 
-    setIsLoading(true);
+    bootstrap();
+  }, []);
+
+  async function loadConversationMessages(
+    conversationId,
+    conversationSnapshot = conversations,
+  ) {
+    setIsLoadingMessages(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/ask`, {
+      const data = await fetchJson(
+        `${API_BASE_URL}/conversations/${conversationId}/messages`,
+      );
+      setActiveConversationId(conversationId);
+      setMessages(data.messages);
+      setConversations(
+        conversationSnapshot.map((conversation) =>
+          conversation.id === conversationId ? data.conversation : conversation,
+        ),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Something went wrong while loading the conversation.",
+      );
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }
+
+  async function handleCreateConversation() {
+    setError("");
+
+    try {
+      const conversation = await fetchJson(`${API_BASE_URL}/conversations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          question: trimmedQuestion,
-          top_k: 5,
+          title: "New chat",
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      setResult(data);
+      setConversations((currentConversations) => [conversation, ...currentConversations]);
+      setActiveConversationId(conversation.id);
+      setMessages([]);
+      setQuestion("");
+      return conversation;
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Something went wrong while contacting the API.",
+          : "Something went wrong while creating a conversation.",
       );
-    } finally {
-      setIsLoading(false);
+      return null;
     }
   }
 
-  const parsedResult = result ? splitAnswerAndCitations(result.answer) : null;
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion || isSending) {
+      return;
+    }
+
+    setIsSending(true);
+    setError("");
+
+    try {
+      let conversationId = activeConversationId;
+
+      if (!conversationId) {
+        const conversation = await handleCreateConversation();
+        conversationId = conversation?.id ?? null;
+      }
+
+      if (!conversationId) {
+        throw new Error("Unable to create a conversation.");
+      }
+
+      const data = await fetchJson(
+        `${API_BASE_URL}/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            question: trimmedQuestion,
+            top_k: 5,
+          }),
+        },
+      );
+
+      setQuestion("");
+      setActiveConversationId(conversationId);
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        data.user_message,
+        data.assistant_message,
+      ]);
+      setConversations((currentConversations) => {
+        const filteredConversations = currentConversations.filter(
+          (conversation) => conversation.id !== data.conversation.id,
+        );
+        return [data.conversation, ...filteredConversations];
+      });
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Something went wrong while sending the message.",
+      );
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  const activeConversation = conversations.find(
+    (conversation) => conversation.id === activeConversationId,
+  );
 
   return (
     <div className="app-shell">
-      <main className="panel">
-        <section className="hero">
-          <p className="eyebrow">Minimal React UI</p>
-          <h1>Tech Fault RAG Bot</h1>
-          <p className="hero-copy">
-            Ask a troubleshooting question and inspect the retrieved document
-            chunks that support the answer.
-          </p>
-        </section>
+      <main className="workspace">
+        <aside className="sidebar">
+          <div className="sidebar-header">
+            <div>
+              <p className="eyebrow">Saved Chats</p>
+              <h1>Tech Fault RAG Bot</h1>
+            </div>
+            <button
+              className="new-chat-button"
+              onClick={handleCreateConversation}
+              type="button"
+            >
+              New chat
+            </button>
+          </div>
 
-        <form className="question-form" onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="question">
-            Troubleshooting question
-          </label>
-          <textarea
-            id="question"
-            className="question-input"
-            rows="4"
-            placeholder="Example: Why would a cable modem stay stuck in ranging?"
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-          />
-          <button className="submit-button" disabled={isLoading} type="submit">
-            {isLoading ? "Asking..." : "Ask"}
-          </button>
-        </form>
-
-        {error ? <p className="error-banner">{error}</p> : null}
-
-        {result ? (
-          <section className="results-grid">
-            <article className="card">
-              <div className="card-header">
-                <h2>Answer</h2>
-              </div>
-              <p className="question-summary">Question: {result.question}</p>
-              <div className="answer-body">
-                {formatAnswerParagraphs(parsedResult.answerText).map((line, index) => (
-                  <p key={`${line}-${index}`}>{line || "\u00a0"}</p>
-                ))}
-              </div>
-              {parsedResult.citations.length ? (
-                <div className="citations-panel">
-                  <div className="citations-header">
-                    <h3>Used Sources</h3>
-                    <span>{parsedResult.citations.length} cited</span>
-                  </div>
-                  <div className="citation-list">
-                    {parsedResult.citations.map((citation, index) => {
-                      const chunk =
-                        citation.sourceNumber != null
-                          ? result.retrieved_chunks[citation.sourceNumber - 1]
-                          : null;
-
-                      return (
-                        <div className="citation-item" key={`${citation.label}-${index}`}>
-                          <div className="citation-badge">{citation.label}</div>
-                          <div className="citation-content">
-                            <p>{citation.detail}</p>
-                            {chunk ? (
-                              <p className="citation-meta">
-                                Matches retrieved chunk from {chunk.source}, page{" "}
-                                {chunk.page}, chunk {chunk.chunk_index}
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
-            </article>
-
-            <article className="card">
-              <div className="card-header">
-                <h2>Retrieved Chunks</h2>
-                <span className="chunk-count">
-                  {result.retrieved_chunks.length} sources
+          <div className="conversation-list">
+            {conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                className={
+                  conversation.id === activeConversationId
+                    ? "conversation-item active"
+                    : "conversation-item"
+                }
+                onClick={() => loadConversationMessages(conversation.id)}
+                type="button"
+              >
+                <span className="conversation-title">{conversation.title}</span>
+                <span className="conversation-meta">
+                  {new Date(conversation.updated_at).toLocaleString()}
                 </span>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="chat-panel">
+          <header className="chat-header">
+            <div>
+              <p className="eyebrow">Conversation</p>
+              <h2>{activeConversation?.title ?? "Loading..."}</h2>
+            </div>
+            <p className="hero-copy">
+              Ask troubleshooting questions and keep each answer, citation, and
+              retrieved source in a saved thread.
+            </p>
+          </header>
+
+          {error ? <p className="error-banner">{error}</p> : null}
+
+          <div className="message-thread">
+            {isBootstrapping || isLoadingMessages ? (
+              <div className="empty-state">
+                <p>Loading conversation history...</p>
               </div>
-              <div className="chunk-list">
-                {result.retrieved_chunks.map((chunk, index) => (
-                  <details className="chunk-item" key={`${chunk.source}-${index}`}>
-                    <summary>
-                      Source {index + 1}: {chunk.source} | page {chunk.page} |
-                      {" "}chunk {chunk.chunk_index}
-                    </summary>
-                    <p>{chunk.text}</p>
-                  </details>
-                ))}
+            ) : messages.length === 0 ? (
+              <div className="empty-state">
+                <p>No messages yet. Ask your first troubleshooting question.</p>
               </div>
-            </article>
-          </section>
-        ) : null}
+            ) : (
+              messages.map((message) => {
+                const display = getDisplayContent(message);
+
+                return (
+                  <article
+                    className={
+                      message.role === "user"
+                        ? "message-card user-message"
+                        : "message-card assistant-message"
+                    }
+                    key={message.id}
+                  >
+                    <div className="message-label">
+                      {message.role === "user" ? "You" : "Assistant"}
+                    </div>
+                    <div className="message-body">
+                      {formatAnswerParagraphs(display.answerText).map((line, index) => (
+                        <p key={`${message.id}-${index}`}>{line}</p>
+                      ))}
+                    </div>
+
+                    {message.role === "assistant" && display.citations.length ? (
+                      <div className="citations-panel">
+                        <div className="citations-header">
+                          <h3>Used Sources</h3>
+                          <span>{display.citations.length} cited</span>
+                        </div>
+                        <div className="citation-list">
+                          {display.citations.map((citation, index) => {
+                            const chunk =
+                              citation.source_number != null
+                                ? message.retrieved_chunks[citation.source_number - 1]
+                                : null;
+
+                            return (
+                              <div className="citation-item" key={`${message.id}-${index}`}>
+                                <div className="citation-badge">{citation.label}</div>
+                                <div className="citation-content">
+                                  <p>{citation.detail}</p>
+                                  {chunk ? (
+                                    <p className="citation-meta">
+                                      Matches retrieved chunk from {chunk.source},
+                                      {" "}page {chunk.page}, chunk {chunk.chunk_index}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {message.role === "assistant" && message.retrieved_chunks.length ? (
+                      <div className="source-section">
+                        <div className="citations-header">
+                          <h3>Retrieved Chunks</h3>
+                          <span>{message.retrieved_chunks.length} sources</span>
+                        </div>
+                        <div className="chunk-list">
+                          {message.retrieved_chunks.map((chunk, index) => (
+                            <details className="chunk-item" key={`${message.id}-${index}`}>
+                              <summary>
+                                Source {index + 1}: {chunk.source} | page {chunk.page} |
+                                {" "}chunk {chunk.chunk_index}
+                              </summary>
+                              <p>{chunk.text}</p>
+                            </details>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })
+            )}
+          </div>
+
+          <form className="composer" onSubmit={handleSubmit}>
+            <label className="field-label" htmlFor="question">
+              Troubleshooting question
+            </label>
+            <textarea
+              id="question"
+              className="question-input"
+              rows="4"
+              placeholder="Example: Why would a cable modem stay stuck in ranging?"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+            />
+            <button className="submit-button" disabled={isSending} type="submit">
+              {isSending ? "Sending..." : "Send"}
+            </button>
+          </form>
+        </section>
       </main>
     </div>
   );

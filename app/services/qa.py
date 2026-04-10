@@ -21,6 +21,37 @@ Text: {chunk["text"]}
     return "\n\n".join(context_parts)
 
 
+def parse_citations(answer_text: str) -> list[dict]:
+    parts = answer_text.split("\nCitations\n")
+    if len(parts) < 2:
+        return []
+
+    citations = []
+    for line in parts[-1].strip().splitlines():
+        cleaned_line = line.removeprefix("-").strip()
+        if not cleaned_line:
+            continue
+
+        prefix, _, detail = cleaned_line.partition("]")
+        source_label = prefix.removeprefix("[").strip() if prefix else "Source"
+        source_number = None
+
+        if source_label.lower().startswith("source "):
+            number_text = source_label.split(" ", maxsplit=1)[-1].strip()
+            if number_text.isdigit():
+                source_number = int(number_text)
+
+        citations.append(
+            {
+                "label": source_label,
+                "source_number": source_number,
+                "detail": detail.strip(),
+            }
+        )
+
+    return citations
+
+
 def answer_with_citations(query: str, top_k: int = 5) -> dict:
     chunks = retrieve_chunks(query, top_k=top_k)
     context = build_context(chunks)
@@ -58,5 +89,6 @@ User Question:
     return {
         "question": query,
         "answer": answer_text,
+        "citations": parse_citations(answer_text),
         "retrieved_chunks": chunks,
     }
