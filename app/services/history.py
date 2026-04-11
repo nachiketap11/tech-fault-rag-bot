@@ -25,6 +25,7 @@ def initialize_history_db() -> None:
             """
             CREATE TABLE IF NOT EXISTS conversations (
                 id TEXT PRIMARY KEY,
+                user_id TEXT,
                 title TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -45,46 +46,59 @@ def initialize_history_db() -> None:
             )
             """
         )
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(conversations)").fetchall()
+        }
+        if "user_id" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE conversations
+                ADD COLUMN user_id TEXT
+                """
+            )
 
 
-def list_conversations() -> list[dict]:
+def list_conversations(user_id: str) -> list[dict]:
     with _get_connection() as connection:
         rows = connection.execute(
             """
-            SELECT id, title, created_at, updated_at
+            SELECT id, user_id, title, created_at, updated_at
             FROM conversations
+            WHERE user_id = ?
             ORDER BY updated_at DESC
-            """
+            """,
+            (user_id,),
         ).fetchall()
 
     return [dict(row) for row in rows]
 
 
-def create_conversation(title: str = "New chat") -> dict:
+def create_conversation(user_id: str, title: str = "New chat") -> dict:
     conversation_id = str(uuid.uuid4())
     now = _utc_now()
 
     with _get_connection() as connection:
         connection.execute(
             """
-            INSERT INTO conversations (id, title, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (conversation_id, title, now, now),
+            (conversation_id, user_id, title, now, now),
         )
 
-    return get_conversation(conversation_id)
+    return get_conversation(conversation_id, user_id)
 
 
-def get_conversation(conversation_id: str) -> dict | None:
+def get_conversation(conversation_id: str, user_id: str) -> dict | None:
     with _get_connection() as connection:
         row = connection.execute(
             """
-            SELECT id, title, created_at, updated_at
+            SELECT id, user_id, title, created_at, updated_at
             FROM conversations
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             """,
-            (conversation_id,),
+            (conversation_id, user_id),
         ).fetchone()
 
     return dict(row) if row else None
@@ -165,7 +179,7 @@ def get_message(message_id: str) -> dict | None:
     return _deserialize_message(row) if row else None
 
 
-def update_conversation_title(conversation_id: str, title: str) -> None:
+def update_conversation_title(conversation_id: str, user_id: str, title: str) -> None:
     updated_at = _utc_now()
 
     with _get_connection() as connection:
@@ -173,14 +187,25 @@ def update_conversation_title(conversation_id: str, title: str) -> None:
             """
             UPDATE conversations
             SET title = ?, updated_at = ?
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             """,
-            (title, updated_at, conversation_id),
+            (title, updated_at, conversation_id, user_id),
         )
 
 
-def delete_conversation(conversation_id: str) -> None:
+def delete_conversation(conversation_id: str, user_id: str) -> None:
     with _get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id
+            FROM conversations
+            WHERE id = ? AND user_id = ?
+            """,
+            (conversation_id, user_id),
+        ).fetchone()
+        if not row:
+            return
+
         connection.execute(
             """
             DELETE FROM messages
@@ -191,9 +216,9 @@ def delete_conversation(conversation_id: str) -> None:
         connection.execute(
             """
             DELETE FROM conversations
-            WHERE id = ?
+            WHERE id = ? AND user_id = ?
             """,
-            (conversation_id,),
+            (conversation_id, user_id),
         )
 
 
