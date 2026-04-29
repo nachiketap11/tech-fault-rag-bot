@@ -2,6 +2,62 @@ Tech Fault RAG Chatbot
 
 A Retrieval-Augmented Generation (RAG) chatbot designed to answer technical queries by combining vector search with large language models. The backend is built with FastAPI, and the UI now has a minimal React frontend that talks to the existing `/ask` API.
 
+Architecture
+
+```mermaid
+flowchart LR
+    subgraph User_Interface["User interface"]
+        Browser["Browser"]
+        React["React + Vite frontend"]
+    end
+
+    subgraph API["FastAPI backend"]
+        Main["app/main.py"]
+        Auth["Auth service"]
+        History["Chat history service"]
+        QA["QA service"]
+        Retrieval["Retrieval service"]
+    end
+
+    subgraph Storage["Local storage"]
+        ChatDB["SQLite chat/auth DB"]
+        Chroma["ChromaDB vector store"]
+        RawDocs["PDF manuals in data/raw_docs"]
+    end
+
+    subgraph Ingestion["Offline ingestion"]
+        Ingest["scripts/ingest_docs.py"]
+        Loader["PDF loader"]
+        Chunker["Text chunker"]
+        Embedder["Embedding service"]
+    end
+
+    OpenAIEmbeddings["OpenAI embeddings API"]
+    OpenAILLM["OpenAI Responses API"]
+
+    Browser --> React
+    React -->|"login/signup, conversations, questions"| Main
+    Main --> Auth
+    Main --> History
+    Auth <--> ChatDB
+    History <--> ChatDB
+    Main -->|"question"| QA
+    QA --> Retrieval
+    Retrieval -->|"embed query"| OpenAIEmbeddings
+    Retrieval -->|"vector search"| Chroma
+    QA -->|"retrieved context + prompt"| OpenAILLM
+    OpenAILLM -->|"answer + citations"| QA
+    QA --> Main
+    Main --> React
+
+    RawDocs --> Ingest
+    Ingest --> Loader
+    Loader --> Chunker
+    Chunker --> Embedder
+    Embedder -->|"embed chunks"| OpenAIEmbeddings
+    Embedder --> Chroma
+```
+
 Features
 Semantic Search using vector embeddings
 RAG Pipeline (Retrieve -> Augment -> Generate)
