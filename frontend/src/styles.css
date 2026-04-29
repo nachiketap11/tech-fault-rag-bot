@@ -107,8 +107,7 @@ input {
 }
 
 .sidebar,
-.chat-panel,
-.message-card {
+.chat-panel {
   border: 1px solid #303030;
   background: #171717;
 }
@@ -430,6 +429,8 @@ input {
   max-width: 768px;
   margin: 0 auto;
   width: 100%;
+  border: 0;
+  background: transparent;
 }
 
 .user-message {
@@ -820,9 +821,10 @@ input {
   background: transparent;
   padding: 8px 0;
   resize: none;
-  min-height: 24px;
-  max-height: 200px;
+  min-height: 40px;
+  max-height: 144px;
   line-height: 1.5;
+  overflow-y: hidden;
 }
 
 .composer .question-input:focus {

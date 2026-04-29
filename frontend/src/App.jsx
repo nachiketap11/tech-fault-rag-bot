@@ -279,6 +279,24 @@ function App() {
     bootstrapChats();
   }, [token, currentUser]);
 
+  useEffect(() => {
+    if (question) {
+      return;
+    }
+
+    document.querySelectorAll(".question-input").forEach((input) => {
+      input.style.height = "";
+      input.style.overflowY = "hidden";
+    });
+  }, [question]);
+
+  function resizeQuestionInput(input) {
+    const maxHeight = 144;
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
+    input.style.overflowY = input.scrollHeight > maxHeight ? "auto" : "hidden";
+  }
+
   function handleRequestError(requestError, fallbackMessage) {
     if (requestError?.status === 401) {
       clearSession();
@@ -491,7 +509,10 @@ function App() {
             rows="1"
             placeholder="Send a message..."
             value={question}
-            onChange={(event) => setQuestion(event.target.value)}
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              resizeQuestionInput(event.currentTarget);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
