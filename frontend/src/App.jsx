@@ -115,6 +115,119 @@ function App() {
   const [isSending, setIsSending] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [menuOpenId, setMenuOpenId] = useState(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    function handleClick() {
+      setMenuOpenId(null);
+    }
+    if (menuOpenId !== null) {
+      window.addEventListener('click', handleClick);
+      return () => window.removeEventListener('click', handleClick);
+    }
+  }, [menuOpenId]);
+
+  async function renameConversation(conversationId, title) {
+    if (!conversationId || isRenaming) {
+      return;
+    }
+
+    const trimmedTitle = title.trim() || "New chat";
+    setIsRenaming(true);
+    setError("");
+
+    try {
+      const updatedConversation = await fetchJson(
+        `${API_BASE_URL}/conversations/${conversationId}`,
+        {
+          method: "PATCH",
+          token,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: trimmedTitle,
+          }),
+        },
+      );
+
+      if (updatedConversation.id === activeConversationId) {
+        setDraftTitle(updatedConversation.title);
+      }
+      setConversations((currentConversations) =>
+        currentConversations.map((conversation) =>
+          conversation.id === updatedConversation.id
+            ? updatedConversation
+            : conversation,
+        ),
+      );
+    } catch (requestError) {
+      handleRequestError(
+        requestError,
+        "Something went wrong while renaming the conversation.",
+      );
+    } finally {
+      setIsRenaming(false);
+    }
+  }
+
+  async function deleteConversation(conversationId) {
+    if (!conversationId || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setError("");
+
+    try {
+      await fetchJson(`${API_BASE_URL}/conversations/${conversationId}`, {
+        method: "DELETE",
+        token,
+      });
+
+      const remainingConversations = conversations.filter(
+        (conversation) => conversation.id !== conversationId,
+      );
+
+      setConversations(remainingConversations);
+
+      if (conversationId !== activeConversationId) {
+        return;
+      }
+
+      setMessages([]);
+      setQuestion("");
+
+      if (remainingConversations.length > 0) {
+        await loadConversationMessages(token, remainingConversations[0].id, remainingConversations);
+      } else {
+        setActiveConversationId(null);
+        setDraftTitle("");
+        await handleCreateConversation();
+      }
+    } catch (requestError) {
+      handleRequestError(
+        requestError,
+        "Something went wrong while deleting the conversation.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  function handleRenameConversationMenu(conversation) {
+    setMenuOpenId(null);
+    const newTitle = prompt("Enter new title:", conversation.title);
+    if (newTitle && newTitle.trim()) {
+      renameConversation(conversation.id, newTitle);
+    }
+  }
+
+  function handleDeleteConversationMenu(conversation) {
+    setMenuOpenId(null);
+    deleteConversation(conversation.id);
+  }
 
   useEffect(() => {
     async function restoreSession() {
@@ -149,12 +262,10 @@ function App() {
         const data = await fetchJson(`${API_BASE_URL}/conversations`, { token });
         const loadedConversations = data.conversations;
         setConversations(loadedConversations);
-
-        if (loadedConversations.length > 0) {
-          await loadConversationMessages(token, loadedConversations[0].id, loadedConversations);
-        } else {
-          await handleCreateConversation(token);
-        }
+        // Do NOT auto-load any conversation. Just show empty state.
+        setActiveConversationId(null);
+        setMessages([]);
+        setDraftTitle("");
       } catch (requestError) {
         handleRequestError(
           requestError,
@@ -359,96 +470,59 @@ function App() {
 
   async function handleRenameConversation(event) {
     event.preventDefault();
-
-    if (!activeConversationId || isRenaming) {
-      return;
-    }
-
-    const trimmedTitle = draftTitle.trim() || "New chat";
-    setIsRenaming(true);
-    setError("");
-
-    try {
-      const updatedConversation = await fetchJson(
-        `${API_BASE_URL}/conversations/${activeConversationId}`,
-        {
-          method: "PATCH",
-          token,
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            title: trimmedTitle,
-          }),
-        },
-      );
-
-      setDraftTitle(updatedConversation.title);
-      setConversations((currentConversations) =>
-        currentConversations.map((conversation) =>
-          conversation.id === updatedConversation.id
-            ? updatedConversation
-            : conversation,
-        ),
-      );
-    } catch (requestError) {
-      handleRequestError(
-        requestError,
-        "Something went wrong while renaming the conversation.",
-      );
-    } finally {
-      setIsRenaming(false);
-    }
+    await renameConversation(activeConversationId, draftTitle);
   }
 
   async function handleDeleteConversation() {
-    if (!activeConversationId || isDeleting) {
-      return;
-    }
-
-    setIsDeleting(true);
-    setError("");
-
-    try {
-      await fetchJson(`${API_BASE_URL}/conversations/${activeConversationId}`, {
-        method: "DELETE",
-        token,
-      });
-
-      const remainingConversations = conversations.filter(
-        (conversation) => conversation.id !== activeConversationId,
-      );
-
-      setConversations(remainingConversations);
-      setMessages([]);
-      setQuestion("");
-
-      if (remainingConversations.length > 0) {
-        await loadConversationMessages(token, remainingConversations[0].id, remainingConversations);
-      } else {
-        setActiveConversationId(null);
-        setDraftTitle("");
-        await handleCreateConversation();
-      }
-    } catch (requestError) {
-      handleRequestError(
-        requestError,
-        "Something went wrong while deleting the conversation.",
-      );
-    } finally {
-      setIsDeleting(false);
-    }
+    await deleteConversation(activeConversationId);
   }
 
   const activeConversation = conversations.find(
     (conversation) => conversation.id === activeConversationId,
   );
 
+  function renderComposer(className = "composer") {
+    return (
+      <form className={className} onSubmit={handleSubmit}>
+        <div className="composer-inner">
+          <textarea
+            id="question"
+            className="question-input"
+            rows="1"
+            placeholder="Send a message..."
+            value={question}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                handleSubmit(event);
+              }
+            }}
+          />
+          <button 
+            className="submit-button" 
+            disabled={isSending || !question.trim()} 
+            type="submit"
+          >
+            {isSending ? (
+              <div className="loading-spinner"></div>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   if (isAuthLoading) {
     return (
-      <div className="app-shell">
+      <div className="app-shell auth-shell">
         <div className="auth-card">
-          <p>Loading your session...</p>
+          <div className="loading-spinner"></div>
+          <p style={{ marginTop: '12px' }}>Loading...</p>
         </div>
       </div>
     );
@@ -527,108 +601,115 @@ function App() {
 
   return (
     <div className="app-shell">
-      <main className="workspace">
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            <div>
-              <p className="eyebrow">Saved Chats</p>
-              <h1>Tech Fault RAG Bot</h1>
-              <p className="sidebar-user">{currentUser.email}</p>
-            </div>
-            <div className="sidebar-actions">
-              <button
-                className="new-chat-button"
-                onClick={() => handleCreateConversation()}
-                type="button"
-              >
-                New chat
-              </button>
-              <button className="secondary-button" onClick={clearSession} type="button">
-                Log out
-              </button>
-            </div>
-          </div>
+      <aside className="sidebar">
+        <div className="sidebar-header">
+          <button
+            className="new-chat-button"
+            onClick={() => handleCreateConversation()}
+            type="button"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            New chat
+          </button>
+        </div>
 
-          <div className="conversation-list">
-            {conversations.map((conversation) => (
+        <div className="conversation-list">
+          <div className="sidebar-section-title">Recent</div>
+          {conversations.map((conversation) => (
+            <div
+              className={
+                conversation.id === activeConversationId
+                  ? "conversation-row active"
+                  : "conversation-row"
+              }
+              key={conversation.id}
+            >
               <button
-                key={conversation.id}
-                className={
-                  conversation.id === activeConversationId
-                    ? "conversation-item active"
-                    : "conversation-item"
-                }
+                className="conversation-item"
                 onClick={() => loadConversationMessages(token, conversation.id)}
                 type="button"
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
                 <span className="conversation-title">{conversation.title}</span>
-                <span className="conversation-meta">
-                  {new Date(conversation.updated_at).toLocaleString()}
-                </span>
               </button>
-            ))}
+              <div className="conversation-menu">
+                <button
+                  className="conversation-menu-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuOpenId(menuOpenId === conversation.id ? null : conversation.id);
+                  }}
+                  aria-label="Conversation menu"
+                  type="button"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="5" cy="12" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="19" cy="12" r="2" />
+                  </svg>
+                </button>
+                {menuOpenId === conversation.id && (
+                  <div className="conversation-menu-dropdown">
+                    <button className="conversation-menu-item" onClick={() => handleRenameConversationMenu(conversation)} type="button">
+                      Edit
+                    </button>
+                    <button className="conversation-menu-item" onClick={() => handleDeleteConversationMenu(conversation)} type="button">
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="sidebar-footer">
+          <div className="sidebar-user-info">
+            <div className="user-avatar">
+              {currentUser?.email?.charAt(0).toUpperCase()}
+            </div>
+            <span className="user-email">{currentUser?.email}</span>
           </div>
-        </aside>
+          <button className="secondary-button" onClick={clearSession} type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
+            Log out
+          </button>
+        </div>
+      </aside>
 
-        <section className="chat-panel">
-          <header className="chat-header">
-            <div>
-              <p className="eyebrow">Conversation</p>
-              <h2>{activeConversation?.title ?? "Loading..."}</h2>
-            </div>
-            <p className="hero-copy">
-              Ask troubleshooting questions and keep each answer, citation, and
-              retrieved source in your own saved thread.
-            </p>
-          </header>
-
-          <form className="conversation-toolbar" onSubmit={handleRenameConversation}>
-            <div className="toolbar-field">
-              <label className="field-label" htmlFor="conversation-title">
-                Conversation title
-              </label>
-              <input
-                id="conversation-title"
-                className="title-input"
-                disabled={!activeConversation || isRenaming || isDeleting}
-                onChange={(event) => setDraftTitle(event.target.value)}
-                value={draftTitle}
-              />
-            </div>
-            <div className="toolbar-actions">
-              <button
-                className="secondary-button"
-                disabled={!activeConversation || isRenaming || isDeleting}
-                type="submit"
-              >
-                {isRenaming ? "Saving..." : "Rename"}
-              </button>
-              <button
-                className="danger-button"
-                disabled={!activeConversation || isDeleting || isRenaming}
-                onClick={handleDeleteConversation}
-                type="button"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </form>
-
+      <main className="chat-panel">
+        <header className="chat-header">
+          <h2>{activeConversation?.title ?? "New Chat"}</h2>
+        </header>
           {error ? <p className="error-banner">{error}</p> : null}
 
-          <div className="message-thread">
-            {isBootstrapping || isLoadingMessages ? (
+        <div className="message-thread">
+          {isBootstrapping || isLoadingMessages ? (
+            <div className="empty-state">
+              <div className="loading-spinner"></div>
+              <p>Loading...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="empty-chat">
               <div className="empty-state">
-                <p>Loading conversation history...</p>
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <h3>How can I help you today?</h3>
+                <p>Ask me anything about technical troubleshooting.</p>
               </div>
-            ) : messages.length === 0 ? (
-              <div className="empty-state">
-                <p>No messages yet. Ask your first troubleshooting question.</p>
-              </div>
-            ) : (
-              messages.map((message) => {
+              {renderComposer()}
+            </div>
+          ) : (
+            <>
+              {messages.map((message) => {
                 const display = getDisplayContent(message);
-
                 return (
                   <article
                     className={
@@ -638,13 +719,28 @@ function App() {
                     }
                     key={message.id}
                   >
-                    <div className="message-label">
-                      {message.role === "user" ? "You" : "Assistant"}
+                    <div className="message-icon">
+                      {message.role === "user" ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
+                          <path d="M12 6v6l4 2" />
+                        </svg>
+                      )}
                     </div>
-                    <div className="message-body">
-                      {formatAnswerParagraphs(display.answerText).map((line, index) => (
-                        <p key={`${message.id}-${index}`}>{line}</p>
-                      ))}
+                    <div className="message-content">
+                      <div className="message-label">
+                        {message.role === "user" ? "You" : "Tech Fault RAG Bot"}
+                      </div>
+                      <div className="message-body">
+                        {formatAnswerParagraphs(display.answerText).map((line, index) => (
+                          <p key={`${message.id}-${index}`}>{line}</p>
+                        ))}
+                      </div>
                     </div>
 
                     {message.role === "assistant" && display.citations.length ? (
@@ -700,30 +796,16 @@ function App() {
                     ) : null}
                   </article>
                 );
-              })
-            )}
-          </div>
-
-          <form className="composer" onSubmit={handleSubmit}>
-            <label className="field-label" htmlFor="question">
-              Troubleshooting question
-            </label>
-            <textarea
-              id="question"
-              className="question-input"
-              rows="4"
-              placeholder="Example: Why would a cable modem stay stuck in ranging?"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-            />
-            <button className="submit-button" disabled={isSending} type="submit">
-              {isSending ? "Sending..." : "Send"}
-            </button>
-          </form>
-        </section>
-      </main>
-    </div>
-  );
-}
+              })}
+            </>
+          )}
+        </div>
+        {messages.length > 0 && !isBootstrapping && !isLoadingMessages
+          ? renderComposer("composer docked-composer")
+          : null}
+        </main>
+      </div>
+    );
+  }
 
 export default App;
