@@ -1,129 +1,126 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="780" viewBox="0 0 1280 780" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="760" viewBox="0 0 1280 760" role="img" aria-labelledby="title desc">
   <title id="title">Tech Fault RAG Bot Architecture</title>
-  <desc id="desc">Architecture diagram showing the React frontend, FastAPI backend, local storage, OpenAI APIs, and offline PDF ingestion pipeline.</desc>
+  <desc id="desc">Clean architecture diagram showing the runtime RAG flow and offline PDF ingestion flow for the Tech Fault RAG Bot.</desc>
   <defs>
     <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
       <path d="M2,2 L10,6 L2,10 Z" fill="#334155"/>
     </marker>
     <style>
       .canvas { fill: #f8fafc; }
-      .group { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
-      .group-title { font: 700 22px Arial, sans-serif; fill: #0f172a; }
-      .node { stroke-width: 2; rx: 12; }
-      .frontend { fill: #ecfeff; stroke: #0891b2; }
-      .backend { fill: #eff6ff; stroke: #2563eb; }
-      .storage { fill: #f0fdf4; stroke: #16a34a; }
+      .title { font: 700 34px Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 18px Arial, sans-serif; fill: #475569; }
+      .section { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; rx: 18; }
+      .section-title { font: 700 24px Arial, sans-serif; fill: #0f172a; }
+      .box { stroke-width: 2.5; rx: 12; }
+      .ui { fill: #ecfeff; stroke: #0891b2; }
+      .api { fill: #eff6ff; stroke: #2563eb; }
+      .store { fill: #f0fdf4; stroke: #16a34a; }
       .external { fill: #fff7ed; stroke: #ea580c; }
-      .ingestion { fill: #fdf2f8; stroke: #db2777; }
-      .node-title { font: 700 18px Arial, sans-serif; fill: #0f172a; }
-      .node-subtitle { font: 15px Arial, sans-serif; fill: #475569; }
+      .ingest { fill: #fdf2f8; stroke: #db2777; }
+      .box-title { font: 700 19px Arial, sans-serif; fill: #0f172a; }
+      .box-subtitle { font: 15px Arial, sans-serif; fill: #475569; }
+      .line { fill: none; stroke: #334155; stroke-width: 2.8; marker-end: url(#arrow); }
+      .soft-line { fill: none; stroke: #64748b; stroke-width: 2.6; stroke-dasharray: 8 7; marker-end: url(#arrow); }
       .label { font: 14px Arial, sans-serif; fill: #334155; }
-      .line { fill: none; stroke: #334155; stroke-width: 2.5; marker-end: url(#arrow); }
-      .line-soft { fill: none; stroke: #64748b; stroke-width: 2.5; marker-end: url(#arrow); stroke-dasharray: 8 7; }
-      .badge { fill: #e2e8f0; }
-      .badge-text { font: 700 13px Arial, sans-serif; fill: #334155; letter-spacing: 0; }
+      .pill { fill: #e2e8f0; }
+      .pill-text { font: 700 13px Arial, sans-serif; fill: #334155; }
     </style>
   </defs>
 
-  <rect class="canvas" width="1280" height="780"/>
-  <text x="48" y="52" font-family="Arial, sans-serif" font-size="30" font-weight="700" fill="#0f172a">Tech Fault RAG Bot Architecture</text>
-  <text x="48" y="82" font-family="Arial, sans-serif" font-size="16" fill="#475569">Runtime question answering flow plus offline document ingestion into the vector store.</text>
+  <rect class="canvas" width="1280" height="760"/>
+  <text class="title" x="56" y="56">Tech Fault RAG Bot Architecture</text>
+  <text class="subtitle" x="56" y="88">Runtime question answering flow with a separate offline ingestion pipeline for technical manuals.</text>
 
-  <rect class="group" x="42" y="126" width="230" height="250"/>
-  <text class="group-title" x="66" y="162">User interface</text>
-  <rect class="node frontend" x="76" y="196" width="162" height="62"/>
-  <text class="node-title" x="157" y="222" text-anchor="middle">Browser</text>
-  <text class="node-subtitle" x="157" y="245" text-anchor="middle">end user</text>
-  <rect class="node frontend" x="76" y="286" width="162" height="62"/>
-  <text class="node-title" x="157" y="312" text-anchor="middle">React + Vite</text>
-  <text class="node-subtitle" x="157" y="335" text-anchor="middle">frontend</text>
+  <rect class="section" x="48" y="124" width="1184" height="390"/>
+  <text class="section-title" x="76" y="166">Runtime RAG flow</text>
+  <rect class="pill" x="1070" y="142" width="106" height="28" rx="14"/>
+  <text class="pill-text" x="1123" y="161" text-anchor="middle">online</text>
 
-  <rect class="group" x="342" y="126" width="306" height="460"/>
-  <text class="group-title" x="366" y="162">FastAPI backend</text>
-  <rect class="node backend" x="386" y="196" width="218" height="62"/>
-  <text class="node-title" x="495" y="222" text-anchor="middle">app/main.py</text>
-  <text class="node-subtitle" x="495" y="245" text-anchor="middle">API routes + CORS</text>
-  <rect class="node backend" x="386" y="286" width="218" height="62"/>
-  <text class="node-title" x="495" y="312" text-anchor="middle">Auth service</text>
-  <text class="node-subtitle" x="495" y="335" text-anchor="middle">signup, login, tokens</text>
-  <rect class="node backend" x="386" y="376" width="218" height="62"/>
-  <text class="node-title" x="495" y="402" text-anchor="middle">History service</text>
-  <text class="node-subtitle" x="495" y="425" text-anchor="middle">conversations + messages</text>
-  <rect class="node backend" x="386" y="466" width="218" height="62"/>
-  <text class="node-title" x="495" y="492" text-anchor="middle">QA service</text>
-  <text class="node-subtitle" x="495" y="515" text-anchor="middle">prompt + citations</text>
+  <rect class="box ui" x="92" y="244" width="176" height="78"/>
+  <text class="box-title" x="180" y="276" text-anchor="middle">React + Vite</text>
+  <text class="box-subtitle" x="180" y="300" text-anchor="middle">browser UI</text>
 
-  <rect class="group" x="722" y="126" width="234" height="460"/>
-  <text class="group-title" x="746" y="162">Retrieval + storage</text>
-  <rect class="node backend" x="758" y="196" width="162" height="62"/>
-  <text class="node-title" x="839" y="222" text-anchor="middle">Search</text>
-  <text class="node-subtitle" x="839" y="245" text-anchor="middle">embed query</text>
-  <rect class="node storage" x="758" y="376" width="162" height="62"/>
-  <text class="node-title" x="839" y="402" text-anchor="middle">SQLite</text>
-  <text class="node-subtitle" x="839" y="425" text-anchor="middle">auth + chat history</text>
-  <rect class="node storage" x="758" y="466" width="162" height="62"/>
-  <text class="node-title" x="839" y="492" text-anchor="middle">ChromaDB</text>
-  <text class="node-subtitle" x="839" y="515" text-anchor="middle">vector store</text>
+  <rect class="box api" x="342" y="186" width="190" height="74"/>
+  <text class="box-title" x="437" y="216" text-anchor="middle">FastAPI routes</text>
+  <text class="box-subtitle" x="437" y="239" text-anchor="middle">auth, chats, ask</text>
 
-  <rect class="group" x="1012" y="126" width="226" height="250"/>
-  <text class="group-title" x="1036" y="162">External APIs</text>
-  <rect class="node external" x="1044" y="196" width="162" height="62"/>
-  <text class="node-title" x="1125" y="222" text-anchor="middle">OpenAI</text>
-  <text class="node-subtitle" x="1125" y="245" text-anchor="middle">embeddings</text>
-  <rect class="node external" x="1044" y="286" width="162" height="62"/>
-  <text class="node-title" x="1125" y="312" text-anchor="middle">OpenAI</text>
-  <text class="node-subtitle" x="1125" y="335" text-anchor="middle">Responses API</text>
+  <rect class="box api" x="342" y="328" width="190" height="74"/>
+  <text class="box-title" x="437" y="358" text-anchor="middle">QA service</text>
+  <text class="box-subtitle" x="437" y="381" text-anchor="middle">prompt + citations</text>
 
-  <rect class="group" x="42" y="626" width="1196" height="110"/>
-  <text class="group-title" x="66" y="662">Offline ingestion</text>
-  <rect class="node storage" x="246" y="648" width="150" height="62"/>
-  <text class="node-title" x="321" y="674" text-anchor="middle">PDF manuals</text>
-  <text class="node-subtitle" x="321" y="697" text-anchor="middle">data/raw_docs</text>
-  <rect class="node ingestion" x="444" y="648" width="150" height="62"/>
-  <text class="node-title" x="519" y="674" text-anchor="middle">PDF loader</text>
-  <text class="node-subtitle" x="519" y="697" text-anchor="middle">pages</text>
-  <rect class="node ingestion" x="642" y="648" width="150" height="62"/>
-  <text class="node-title" x="717" y="674" text-anchor="middle">Chunker</text>
-  <text class="node-subtitle" x="717" y="697" text-anchor="middle">text chunks</text>
-  <rect class="node ingestion" x="840" y="648" width="150" height="62"/>
-  <text class="node-title" x="915" y="674" text-anchor="middle">Embedder</text>
-  <text class="node-subtitle" x="915" y="697" text-anchor="middle">chunk vectors</text>
+  <rect class="box api" x="606" y="328" width="190" height="74"/>
+  <text class="box-title" x="701" y="358" text-anchor="middle">Retrieval</text>
+  <text class="box-subtitle" x="701" y="381" text-anchor="middle">embed query + search</text>
 
-  <path class="line" d="M157 258 L157 286"/>
-  <path class="line" d="M238 317 C285 317 327 227 386 227"/>
-  <text class="label" x="268" y="280">HTTPS API calls</text>
+  <rect class="box external" x="870" y="188" width="178" height="74"/>
+  <text class="box-title" x="959" y="218" text-anchor="middle">OpenAI</text>
+  <text class="box-subtitle" x="959" y="241" text-anchor="middle">Responses API</text>
 
-  <path class="line" d="M495 258 L495 286"/>
-  <path class="line" d="M495 258 L495 376"/>
-  <path class="line" d="M495 258 C620 258 640 497 386 497"/>
-  <path class="line" d="M604 497 C654 497 690 227 758 227"/>
-  <text class="label" x="615" y="374">retrieve top chunks</text>
+  <rect class="box external" x="870" y="328" width="178" height="74"/>
+  <text class="box-title" x="959" y="358" text-anchor="middle">OpenAI</text>
+  <text class="box-subtitle" x="959" y="381" text-anchor="middle">Embeddings API</text>
 
-  <path class="line" d="M920 227 C978 227 986 227 1044 227"/>
-  <text class="label" x="946" y="210">query embedding</text>
-  <path class="line" d="M839 258 C950 326 950 418 839 466"/>
-  <text class="label" x="856" y="365">vector search</text>
-  <path class="line" d="M920 497 C982 497 982 317 1044 317"/>
-  <text class="label" x="943" y="418">context + prompt</text>
-  <path class="line" d="M1044 317 C934 390 728 497 604 497"/>
-  <text class="label" x="782" y="438">answer + citations</text>
-  <path class="line" d="M386 497 C320 497 276 317 238 317"/>
-  <text class="label" x="268" y="455">response</text>
+  <rect class="box store" x="1078" y="210" width="118" height="74"/>
+  <text class="box-title" x="1137" y="240" text-anchor="middle">SQLite</text>
+  <text class="box-subtitle" x="1137" y="263" text-anchor="middle">auth + chats</text>
 
-  <path class="line" d="M604 317 C668 317 700 407 758 407"/>
-  <text class="label" x="626" y="365">auth/chat persisted locally</text>
-  <path class="line" d="M604 407 L758 407"/>
+  <rect class="box store" x="1078" y="350" width="118" height="74"/>
+  <text class="box-title" x="1137" y="380" text-anchor="middle">ChromaDB</text>
+  <text class="box-subtitle" x="1137" y="403" text-anchor="middle">vectors</text>
 
-  <path class="line-soft" d="M396 679 L444 679"/>
-  <path class="line-soft" d="M594 679 L642 679"/>
-  <path class="line-soft" d="M792 679 L840 679"/>
-  <path class="line-soft" d="M990 679 C1035 679 1054 257 1125 258"/>
-  <text class="label" x="1015" y="640">embed chunks</text>
-  <path class="line-soft" d="M915 648 C915 592 875 555 839 528"/>
-  <text class="label" x="920" y="594">store chunks</text>
+  <path class="line" d="M268 283 H342"/>
+  <text class="label" x="288" y="266">API requests</text>
 
-  <rect class="badge" x="48" y="704" width="92" height="24" rx="12"/>
-  <text class="badge-text" x="94" y="721" text-anchor="middle">offline</text>
-  <rect class="badge" x="48" y="96" width="92" height="24" rx="12"/>
-  <text class="badge-text" x="94" y="113" text-anchor="middle">runtime</text>
+  <path class="line" d="M437 260 V328"/>
+  <text class="label" x="454" y="301">questions</text>
+
+  <path class="line" d="M532 365 H606"/>
+  <text class="label" x="548" y="348">retrieve context</text>
+
+  <path class="line" d="M796 365 H870"/>
+  <text class="label" x="808" y="348">embed query</text>
+
+  <path class="line" d="M1048 365 H1078"/>
+  <text class="label" x="1038" y="348">search</text>
+
+  <path class="line" d="M701 328 C715 228 786 225 870 225"/>
+  <text class="label" x="720" y="244">context + prompt</text>
+
+  <path class="line" d="M870 225 C760 258 640 316 532 365"/>
+  <text class="label" x="636" y="290">answer + citations</text>
+
+  <path class="line" d="M342 223 C302 223 284 247 268 283"/>
+  <text class="label" x="278" y="218">responses</text>
+
+  <path class="line" d="M532 223 H1078"/>
+  <text class="label" x="614" y="206">signup, login, conversations, messages</text>
+
+  <rect class="section" x="48" y="558" width="1184" height="142"/>
+  <text class="section-title" x="76" y="610">Offline ingestion flow</text>
+  <rect class="pill" x="1070" y="586" width="106" height="28" rx="14"/>
+  <text class="pill-text" x="1123" y="605" text-anchor="middle">offline</text>
+
+  <rect class="box store" x="278" y="600" width="150" height="68"/>
+  <text class="box-title" x="353" y="628" text-anchor="middle">PDF manuals</text>
+  <text class="box-subtitle" x="353" y="650" text-anchor="middle">data/raw_docs</text>
+
+  <rect class="box ingest" x="498" y="600" width="150" height="68"/>
+  <text class="box-title" x="573" y="628" text-anchor="middle">PDF loader</text>
+  <text class="box-subtitle" x="573" y="650" text-anchor="middle">extract pages</text>
+
+  <rect class="box ingest" x="718" y="600" width="150" height="68"/>
+  <text class="box-title" x="793" y="628" text-anchor="middle">Chunker</text>
+  <text class="box-subtitle" x="793" y="650" text-anchor="middle">split text</text>
+
+  <rect class="box ingest" x="938" y="600" width="150" height="68"/>
+  <text class="box-title" x="1013" y="628" text-anchor="middle">Embedder</text>
+  <text class="box-subtitle" x="1013" y="650" text-anchor="middle">chunk vectors</text>
+
+  <path class="soft-line" d="M428 634 H498"/>
+  <path class="soft-line" d="M648 634 H718"/>
+  <path class="soft-line" d="M868 634 H938"/>
+  <path class="soft-line" d="M1013 600 C1013 520 1048 424 1078 387"/>
+  <text class="label" x="1050" y="536">write chunks</text>
+  <path class="soft-line" d="M1013 600 C1013 526 975 470 959 402"/>
+  <text class="label" x="894" y="536">embed chunks</text>
 </svg>
