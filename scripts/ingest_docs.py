@@ -34,6 +34,10 @@ def ingest_all_pdfs():
 
     print(f"Prepared {len(all_chunk_records)} chunks")
 
+    for pdf_file in pdf_files:
+        collection.delete(where={"source": pdf_file.name})
+        print(f"Cleared existing chunks for {pdf_file.name}")
+
     add_batch_size = 1000
 
     for batch_num, chunk_batch in enumerate(batched(all_chunk_records, add_batch_size), start=1):
@@ -54,14 +58,14 @@ def ingest_all_pdfs():
             for r in chunk_batch
         ]
 
-        collection.add(
+        collection.upsert(
             ids=ids,
             documents=texts,
             embeddings=embeddings,
             metadatas=metadatas,
         )
 
-        print(f"Added batch {batch_num} ({len(chunk_batch)} chunks)")
+        print(f"Upserted batch {batch_num} ({len(chunk_batch)} chunks)")
 
     print(f"Ingested {len(all_chunk_records)} chunks from {len(pdf_files)} PDF(s).")
 

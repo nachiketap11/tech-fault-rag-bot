@@ -1,8 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 const AUTH_STORAGE_KEY = "tech-fault-rag-auth-token";
+const CONFIGURED_INACTIVITY_MINUTES = Number(
+  import.meta.env.VITE_INACTIVITY_TIMEOUT_MINUTES ?? 30,
+);
+const INACTIVITY_LOGOUT_MINUTES =
+  Number.isFinite(CONFIGURED_INACTIVITY_MINUTES) && CONFIGURED_INACTIVITY_MINUTES > 0
+    ? CONFIGURED_INACTIVITY_MINUTES
+    : 30;
+const INACTIVITY_LOGOUT_MS = INACTIVITY_LOGOUT_MINUTES * 60 * 1000;
 
 function splitAnswerAndCitations(answer) {
   const marker = /\nCitations\s*\n/i;
@@ -97,6 +105,47 @@ async function fetchJson(url, options = {}) {
   return response.json();
 }
 
+function createTemporaryId(prefix) {
+  if (globalThis.crypto?.randomUUID) {
+    return `${prefix}-${globalThis.crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}`;
+}
+
+async function readNdjsonStream(response, onEvent) {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Streaming is not supported by this browser.");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) {
+        continue;
+      }
+      onEvent(JSON.parse(line));
+    }
+  }
+
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    onEvent(JSON.parse(buffer));
+  }
+}
+
 function App() {
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ email: "", password: "" });
@@ -116,6 +165,7 @@ function App() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState(null);
+  const inactivityTimerRef = useRef(null);
 
   // Close menu on outside click
   useEffect(() => {
@@ -127,6 +177,48 @@ function App() {
       return () => window.removeEventListener('click', handleClick);
     }
   }, [menuOpenId]);
+
+  useEffect(() => {
+    if (!token || !currentUser) {
+      return undefined;
+    }
+
+    const activityEvents = [
+      "click",
+      "keydown",
+      "mousemove",
+      "scroll",
+      "touchstart",
+      "focus",
+    ];
+
+    function logoutForInactivity() {
+      clearSession();
+      setError(
+        `You were logged out after ${INACTIVITY_LOGOUT_MINUTES} minutes of inactivity.`,
+      );
+    }
+
+    function resetInactivityTimer() {
+      window.clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = window.setTimeout(
+        logoutForInactivity,
+        INACTIVITY_LOGOUT_MS,
+      );
+    }
+
+    resetInactivityTimer();
+    activityEvents.forEach((activityEvent) => {
+      window.addEventListener(activityEvent, resetInactivityTimer, { passive: true });
+    });
+
+    return () => {
+      window.clearTimeout(inactivityTimerRef.current);
+      activityEvents.forEach((activityEvent) => {
+        window.removeEventListener(activityEvent, resetInactivityTimer);
+      });
+    };
+  }, [token, currentUser]);
 
   async function renameConversation(conversationId, title) {
     if (!conversationId || isRenaming) {
@@ -435,6 +527,11 @@ function App() {
     setIsSending(true);
     setError("");
 
+    let didStartStream = false;
+    let didCompleteStream = false;
+    let temporaryUserMessageId = null;
+    let temporaryAssistantMessageId = null;
+
     try {
       let conversationId = activeConversationId;
 
@@ -447,12 +544,42 @@ function App() {
         throw new Error("Unable to create a conversation.");
       }
 
-      const data = await fetchJson(
-        `${API_BASE_URL}/conversations/${conversationId}/messages`,
+      setQuestion("");
+      setActiveConversationId(conversationId);
+      temporaryUserMessageId = createTemporaryId("user");
+      temporaryAssistantMessageId = createTemporaryId("assistant");
+      const temporaryMessages = [
+        {
+          id: temporaryUserMessageId,
+          conversation_id: conversationId,
+          role: "user",
+          content: trimmedQuestion,
+          citations: [],
+          retrieved_chunks: [],
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: temporaryAssistantMessageId,
+          conversation_id: conversationId,
+          role: "assistant",
+          content: "",
+          citations: [],
+          retrieved_chunks: [],
+          created_at: new Date().toISOString(),
+          isStreaming: true,
+        },
+      ];
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        ...temporaryMessages,
+      ]);
+
+      const response = await fetch(
+        `${API_BASE_URL}/conversations/${conversationId}/messages/stream`,
         {
           method: "POST",
-          token,
           headers: {
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -462,21 +589,103 @@ function App() {
         },
       );
 
-      setQuestion("");
-      setActiveConversationId(conversationId);
-      setMessages((currentMessages) => [
-        ...currentMessages,
-        data.user_message,
-        data.assistant_message,
-      ]);
-      setConversations((currentConversations) => {
-        const filteredConversations = currentConversations.filter(
-          (conversation) => conversation.id !== data.conversation.id,
-        );
-        return [data.conversation, ...filteredConversations];
+      if (!response.ok) {
+        let detail = `Request failed with status ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody.detail === "string") {
+            detail = errorBody.detail;
+          }
+        } catch {
+          // Keep fallback detail.
+        }
+
+        const error = new Error(detail);
+        error.status = response.status;
+        throw error;
+      }
+
+      await readNdjsonStream(response, (streamEvent) => {
+        if (streamEvent.type === "start") {
+          didStartStream = true;
+          setMessages((currentMessages) =>
+            currentMessages.map((message) => {
+              if (message.id === temporaryUserMessageId) {
+                return streamEvent.user_message;
+              }
+              if (message.id === temporaryAssistantMessageId) {
+                return {
+                  ...message,
+                  retrieved_chunks: streamEvent.retrieved_chunks ?? [],
+                };
+              }
+              return message;
+            }),
+          );
+          setConversations((currentConversations) => {
+            const filteredConversations = currentConversations.filter(
+              (conversation) => conversation.id !== streamEvent.conversation.id,
+            );
+            return [streamEvent.conversation, ...filteredConversations];
+          });
+          setDraftTitle(streamEvent.conversation.title);
+          return;
+        }
+
+        if (streamEvent.type === "delta") {
+          setMessages((currentMessages) =>
+            currentMessages.map((message) =>
+              message.id === temporaryAssistantMessageId
+                ? { ...message, content: `${message.content}${streamEvent.delta}` }
+                : message,
+            ),
+          );
+          return;
+        }
+
+        if (streamEvent.type === "done") {
+          didCompleteStream = true;
+          setMessages((currentMessages) =>
+            currentMessages.map((message) =>
+              message.id === temporaryAssistantMessageId
+                ? streamEvent.assistant_message
+                : message,
+            ),
+          );
+          setConversations((currentConversations) => {
+            const filteredConversations = currentConversations.filter(
+              (conversation) => conversation.id !== streamEvent.conversation.id,
+            );
+            return [streamEvent.conversation, ...filteredConversations];
+          });
+          setDraftTitle(streamEvent.conversation.title);
+          return;
+        }
+
+        if (streamEvent.type === "error") {
+          throw new Error(streamEvent.detail);
+        }
       });
-      setDraftTitle(data.conversation.title);
     } catch (requestError) {
+      setMessages((currentMessages) =>
+        currentMessages
+          .filter((message) => didStartStream || message.id !== temporaryUserMessageId)
+          .map((message) => {
+            if (message.id !== temporaryAssistantMessageId) {
+              return message;
+            }
+
+            if (didCompleteStream) {
+              return message;
+            }
+
+            return {
+              ...message,
+              content: message.content || "The response was interrupted.",
+              isStreaming: false,
+            };
+          }),
+      );
       handleRequestError(
         requestError,
         "Something went wrong while sending the message.",
@@ -758,9 +967,16 @@ function App() {
                         {message.role === "user" ? "You" : "Tech Fault RAG Bot"}
                       </div>
                       <div className="message-body">
-                        {formatAnswerParagraphs(display.answerText).map((line, index) => (
-                          <p key={`${message.id}-${index}`}>{line}</p>
-                        ))}
+                        {message.isStreaming && !display.answerText ? (
+                          <p className="streaming-placeholder">Thinking...</p>
+                        ) : (
+                          formatAnswerParagraphs(display.answerText).map((line, index) => (
+                            <p key={`${message.id}-${index}`}>{line}</p>
+                          ))
+                        )}
+                        {message.isStreaming && display.answerText ? (
+                          <span className="streaming-cursor" aria-hidden="true" />
+                        ) : null}
                       </div>
                     </div>
 

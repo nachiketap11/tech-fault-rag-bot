@@ -196,6 +196,21 @@ input {
   padding: 10px 16px;
 }
 
+.new-chat-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+}
+
+.new-chat-button svg,
+.secondary-button svg {
+  flex: 0 0 auto;
+  display: block;
+}
+
 .secondary-button {
   color: #ececf1;
   background: transparent;
@@ -464,6 +479,32 @@ input {
 
 .message-body p:last-child {
   margin-bottom: 0;
+}
+
+.streaming-placeholder {
+  color: #8e8e8e;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1rem;
+  margin-left: 2px;
+  border-radius: 2px;
+  background: #ececf1;
+  animation: pulse-cursor 1s ease-in-out infinite;
+  vertical-align: -2px;
+}
+
+@keyframes pulse-cursor {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .citations-panel,

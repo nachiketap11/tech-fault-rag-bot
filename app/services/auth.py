@@ -125,26 +125,33 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 def create_access_token(user: dict) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=ACCESS_TOKEN_EXPIRE_SECONDS)
+    header = {
+        "alg": "HS256",
+        "typ": "JWT",
+    }
     payload = {
         "sub": user["id"],
         "email": user["email"],
         "exp": int(expires_at.timestamp()),
     }
 
+    encoded_header = _urlsafe_encode(json.dumps(header, separators=(",", ":")).encode())
     encoded_payload = _urlsafe_encode(json.dumps(payload, separators=(",", ":")).encode())
+    signing_input = f"{encoded_header}.{encoded_payload}"
     signature = hmac.new(
         AUTH_SECRET_KEY.encode("utf-8"),
-        encoded_payload.encode("utf-8"),
+        signing_input.encode("utf-8"),
         hashlib.sha256,
     ).digest()
     encoded_signature = _urlsafe_encode(signature)
-    return f"{encoded_payload}.{encoded_signature}"
+    return f"{signing_input}.{encoded_signature}"
 
 
 def decode_access_token(token: str) -> dict:
     try:
-        encoded_payload, encoded_signature = token.split(".", maxsplit=1)
+        encoded_header, encoded_payload, encoded_signature = token.split(".", maxsplit=2)
         actual_signature = _urlsafe_decode(encoded_signature)
+        header = json.loads(_urlsafe_decode(encoded_header).decode("utf-8"))
         payload = json.loads(_urlsafe_decode(encoded_payload).decode("utf-8"))
     except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as error:
         raise HTTPException(
@@ -152,9 +159,16 @@ def decode_access_token(token: str) -> dict:
             detail="Invalid authentication token",
         ) from error
 
+    if header.get("alg") != "HS256" or header.get("typ") != "JWT":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token",
+        )
+
+    signing_input = f"{encoded_header}.{encoded_payload}"
     expected_signature = hmac.new(
         AUTH_SECRET_KEY.encode("utf-8"),
-        encoded_payload.encode("utf-8"),
+        signing_input.encode("utf-8"),
         hashlib.sha256,
     ).digest()
     if not hmac.compare_digest(actual_signature, expected_signature):

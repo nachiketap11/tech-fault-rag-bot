@@ -4,6 +4,9 @@ from app.retrieval.vector_store import get_collection
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
+MIN_TOP_K = 1
+MAX_TOP_K = 10
+
 
 def embed_query(text: str) -> list[float]:
     response = client.embeddings.create(
@@ -14,6 +17,7 @@ def embed_query(text: str) -> list[float]:
 
 
 def retrieve_chunks(query: str, top_k: int = 5) -> list[dict]:
+    top_k = max(MIN_TOP_K, min(top_k, MAX_TOP_K))
     collection = get_collection()
     query_embedding = embed_query(query)
 
