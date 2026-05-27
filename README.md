@@ -4,7 +4,7 @@ A Retrieval-Augmented Generation (RAG) chatbot designed to answer technical quer
 
 Architecture
 
-![Tech Fault RAG Bot architecture](docs/architecture.svg)
+![Tech Fault RAG Bot Architecture](docs/images/architecture.png)
 
 Features
 Semantic Search using vector embeddings
