@@ -24,3 +24,6 @@ jobs:
 
       - name: Test
         run: uv run pytest tests/ -v
+        env:
+          # Unit tests don't call the API; a placeholder satisfies the SDK's init check
+          OPENAI_API_KEY: dummy-key-for-unit-tests
