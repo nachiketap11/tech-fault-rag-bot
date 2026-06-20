@@ -1,4 +1,5 @@
 import chromadb
+
 from app.config import CHROMA_PATH, COLLECTION_NAME
 
 

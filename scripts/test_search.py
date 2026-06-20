@@ -1,5 +1,6 @@
 from openai import OpenAI
-from app.config import OPENAI_API_KEY, EMBEDDING_MODEL
+
+from app.config import EMBEDDING_MODEL, OPENAI_API_KEY
 from app.retrieval.vector_store import get_collection
 
 client = OpenAI(api_key=OPENAI_API_KEY)

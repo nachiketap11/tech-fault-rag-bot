@@ -1,6 +1,5 @@
 import re
 
-
 TOKEN_PATTERN = re.compile(r"\S+")
 SENTENCE_BOUNDARY_PATTERN = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])|\n{2,}")
 

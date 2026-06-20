@@ -1,7 +1,7 @@
 [project]
 name = "tech-fault-rag-bot"
 version = "0.1.0"
-description = "Add your description here"
+description = "A RAG chatbot for technical troubleshooting using FastAPI, ChromaDB, and OpenAI."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -13,7 +13,23 @@ dependencies = [
     "uvicorn>=0.42.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.9",
+]
+
 [tool.uv.workspace]
 members = [
     "tech-fault-rag-bot",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]

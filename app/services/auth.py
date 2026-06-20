@@ -4,7 +4,9 @@ import hmac
 import json
 import os
 import sqlite3
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
@@ -13,6 +15,12 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.config import ACCESS_TOKEN_EXPIRE_SECONDS, AUTH_SECRET_KEY, CHAT_DB_PATH
 
 security = HTTPBearer(auto_error=False)
+
+MIN_PASSWORD_LENGTH = 8
+
+_RATE_WINDOW_SECONDS = 60
+_RATE_MAX_ATTEMPTS = 10
+_login_attempts: dict[str, list[float]] = defaultdict(list)
 
 
 def _get_connection() -> sqlite3.Connection:
@@ -35,10 +43,25 @@ def initialize_auth_db() -> None:
         )
 
 
+def check_login_rate_limit(identifier: str) -> None:
+    now = time.time()
+    window_start = now - _RATE_WINDOW_SECONDS
+    recent = [t for t in _login_attempts[identifier] if t > window_start]
+    _login_attempts[identifier] = recent
+    if len(recent) >= _RATE_MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please wait before trying again.",
+        )
+    _login_attempts[identifier].append(now)
+
+
 def create_user(email: str, password: str) -> dict:
     normalized_email = email.strip().lower()
     if not normalized_email or not password:
         raise ValueError("Email and password are required")
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
 
     user_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()

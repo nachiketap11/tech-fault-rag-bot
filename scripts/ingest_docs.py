@@ -1,8 +1,9 @@
 from pathlib import Path
+
 from app.config import DOCS_PATH
-from app.ingestion.pdf_loader import load_pdf_pages
 from app.ingestion.chunker import chunk_page_records
 from app.ingestion.embedder import embed_texts
+from app.ingestion.pdf_loader import load_pdf_pages
 from app.retrieval.vector_store import get_collection
 
 

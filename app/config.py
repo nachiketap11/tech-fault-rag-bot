@@ -1,4 +1,6 @@
 import os
+import sys
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,12 +12,22 @@ def _parse_origins(value: str | None) -> list[str]:
     return [origin.strip() for origin in value.split(",") if origin.strip()]
 
 
+_INSECURE_DEFAULT_KEY = "dev-insecure-auth-secret"
+
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CHROMA_PATH = "data/chroma_db"
 DOCS_PATH = "data/raw_docs"
 CHAT_DB_PATH = "data/chat_history.db"
 COLLECTION_NAME = "tech_fault_docs"
 EMBEDDING_MODEL = "text-embedding-3-small"
+LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4.1-mini")
 FRONTEND_ORIGINS = _parse_origins(os.getenv("FRONTEND_ORIGINS"))
-AUTH_SECRET_KEY = os.getenv("AUTH_SECRET_KEY", "dev-insecure-auth-secret")
+AUTH_SECRET_KEY = os.getenv("AUTH_SECRET_KEY", _INSECURE_DEFAULT_KEY)
 ACCESS_TOKEN_EXPIRE_SECONDS = int(os.getenv("ACCESS_TOKEN_EXPIRE_SECONDS", "604800"))
+
+if AUTH_SECRET_KEY == _INSECURE_DEFAULT_KEY:
+    print(
+        "WARNING: AUTH_SECRET_KEY is set to the insecure default. "
+        "Set AUTH_SECRET_KEY in your .env file before deploying.",
+        file=sys.stderr,
+    )

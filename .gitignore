@@ -1,8 +1,17 @@
 .env
 __pycache__/
+**/__pycache__/
 *.pyc
+*.pyo
 
 .venv
+.DS_Store
+**/.DS_Store
+
+# Generated data — rebuild with scripts/ingest_docs.py
+data/chroma_db/
+data/raw_docs/
 data/chat_history.db
+
 frontend/node_modules/
 frontend/dist/

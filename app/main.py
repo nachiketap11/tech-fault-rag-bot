@@ -1,18 +1,14 @@
 import json
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
-from app.services.qa import (
-    answer_with_citations,
-    build_citations_from_answer,
-    prepare_answer_generation,
-    stream_answer_text,
-)
+
 from app.config import FRONTEND_ORIGINS
 from app.services.auth import (
     authenticate_user,
+    check_login_rate_limit,
     create_access_token,
     create_user,
     get_current_user,
@@ -28,6 +24,12 @@ from app.services.history import (
     list_conversations,
     list_messages,
     update_conversation_title,
+)
+from app.services.qa import (
+    answer_with_citations,
+    build_citations_from_answer,
+    prepare_answer_generation,
+    stream_answer_text,
 )
 
 app = FastAPI(title="Tech Fault RAG Bot")
@@ -75,7 +77,9 @@ def root():
 
 
 @app.post("/auth/signup")
-def signup(request: AuthRequest):
+def signup(request: AuthRequest, http_request: Request):
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    check_login_rate_limit(client_ip)
     try:
         user = create_user(request.email, request.password)
     except ValueError as error:
@@ -88,7 +92,9 @@ def signup(request: AuthRequest):
 
 
 @app.post("/auth/login")
-def login(request: AuthRequest):
+def login(request: AuthRequest, http_request: Request):
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    check_login_rate_limit(client_ip)
     user = authenticate_user(request.email, request.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")

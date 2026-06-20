@@ -1,7 +1,9 @@
 import re
 
-from openai import OpenAI
-from app.config import OPENAI_API_KEY
+from fastapi import HTTPException
+from openai import OpenAI, OpenAIError
+
+from app.config import LLM_MODEL, OPENAI_API_KEY
 from app.retrieval.search import retrieve_chunks
 
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -137,13 +139,16 @@ def build_citations_from_answer(answer_text: str, chunks: list[dict]) -> list[di
 
 
 def stream_answer_text(prompt: str):
-    with client.responses.stream(
-        model="gpt-4.1-mini",
-        input=prompt,
-    ) as stream:
-        for event in stream:
-            if event.type == "response.output_text.delta":
-                yield event.delta
+    try:
+        with client.responses.stream(
+            model=LLM_MODEL,
+            input=prompt,
+        ) as stream:
+            for event in stream:
+                if event.type == "response.output_text.delta":
+                    yield event.delta
+    except OpenAIError as error:
+        raise HTTPException(status_code=502, detail="LLM service error. Please try again.") from error
 
 
 def answer_with_citations(
@@ -157,10 +162,13 @@ def answer_with_citations(
         conversation_messages=conversation_messages,
     )
 
-    response = client.responses.create(
-        model="gpt-4.1-mini",
-        input=prompt,
-    )
+    try:
+        response = client.responses.create(
+            model=LLM_MODEL,
+            input=prompt,
+        )
+    except OpenAIError as error:
+        raise HTTPException(status_code=502, detail="LLM service error. Please try again.") from error
 
     answer_text = response.output_text
 
